@@ -33,9 +33,8 @@ public class GitHubModelsClient
 
         await foreach (var chunk in response)
         {
-            var content = chunk.Choices.FirstOrDefault()?.Delta?.Content;
-            if (!string.IsNullOrEmpty(content))
-                yield return content;
+            if (!string.IsNullOrEmpty(chunk.ContentUpdate))
+                yield return chunk.ContentUpdate;
         }
     }
 }

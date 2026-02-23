@@ -5,7 +5,11 @@ using System.Text.Json.Serialization;
 
 namespace PrBrain.Api.Middleware;
 
-public class CopilotSignatureMiddleware(RequestDelegate next, IHttpClientFactory httpClientFactory, ILogger<CopilotSignatureMiddleware> logger)
+public class CopilotSignatureMiddleware(
+    RequestDelegate next,
+    IHttpClientFactory httpClientFactory,
+    IHostEnvironment env,
+    ILogger<CopilotSignatureMiddleware> logger)
 {
     private const string PublicKeysUrl = "https://api.github.com/meta/public_keys/copilot_api";
 
@@ -13,6 +17,15 @@ public class CopilotSignatureMiddleware(RequestDelegate next, IHttpClientFactory
     {
         if (context.Request.Path == "/health")
         {
+            await next(context);
+            return;
+        }
+
+        // Skip signature verification in Development — allows local testing with curl/Postman
+        if (env.IsDevelopment())
+        {
+            logger.LogWarning("⚠️  Signature verification SKIPPED (Development mode)");
+            context.Request.EnableBuffering();
             await next(context);
             return;
         }

@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{B2D738DB-737
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrBrain.Api", "src\PrBrain.Api\PrBrain.Api.csproj", "{C5560D6D-EA7B-467D-A291-1FBF565CC980}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrBrain.Mcp", "src\PrBrain.Mcp\PrBrain.Mcp.csproj", "{F0CB29AD-98AC-4686-A022-249F04B6F4C9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +22,13 @@ Global
 		{C5560D6D-EA7B-467D-A291-1FBF565CC980}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C5560D6D-EA7B-467D-A291-1FBF565CC980}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C5560D6D-EA7B-467D-A291-1FBF565CC980}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0CB29AD-98AC-4686-A022-249F04B6F4C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0CB29AD-98AC-4686-A022-249F04B6F4C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0CB29AD-98AC-4686-A022-249F04B6F4C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0CB29AD-98AC-4686-A022-249F04B6F4C9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{C5560D6D-EA7B-467D-A291-1FBF565CC980} = {B2D738DB-7372-4B17-854A-6F73815F8BA4}
+		{F0CB29AD-98AC-4686-A022-249F04B6F4C9} = {B2D738DB-7372-4B17-854A-6F73815F8BA4}
 	EndGlobalSection
 EndGlobal
