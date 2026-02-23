@@ -1,0 +1,29 @@
+# Build outputs
+bin/
+obj/
+
+# .NET user secrets (NEVER commit these)
+**/secrets.json
+**/.secrets/
+
+# Environment files (NEVER commit these)
+.env
+.env.local
+.env*.local
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+
+# ngrok
+ngrok.yml
+*.ngrok-authtoken
