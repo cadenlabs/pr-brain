@@ -1,67 +1,67 @@
 # 🧠 PR Brain
 
-**PR Brain** is a context-aware GitHub Pull Request reviewer built by [CadenLabs](https://github.com/cadenlabs). It goes beyond just reading the diff — it cross-references the linked ticket, team standards, interface contracts, and test coverage to give you deep, actionable code reviews.
+Context-aware PR reviews inside VS Code Copilot Chat.
 
-It ships as two integration surfaces:
+Most PR reviews catch nullable warnings and spelling mistakes. PR Brain reads the **full picture** before it says anything — the diff, the linked ticket, your team's standards, the interface contracts the code must honour, and the test files that already exist.
 
-| Mode | How it works |
-|---|---|
-| **GitHub Copilot Extension** (`PrBrain.Api`) | A Copilot Extension you chat with directly in GitHub Copilot (`@pr-brain review ...`) |
-| **MCP Server** (`PrBrain.Mcp`) | A Model Context Protocol server that works inside VS Code (or any MCP-compatible client) |
+Built by [CadenLabs](https://github.com/cadenlabs). Runs as a local MCP server, zero cloud setup.
 
 ---
 
-## How it works
+## What a review looks like
 
-PR Brain assembles a rich review context before calling the AI model:
+```
+### 🔴 Critical Issues
+PaymentService.ProcessAsync does not wrap the charge + order insert in a
+transaction. If the charge succeeds but the insert fails, the customer is
+billed with no order created.
 
-1. **PR metadata** — title, author, description
-2. **Full diff** — every changed file
-3. **Linked ticket** — auto-detected issue linked in the PR body
-4. **Team standards** — reads `.github/review-brain.md` from the target repo
-5. **Interface contracts** — fetches interface files (`I*.cs`) touched by the PR
-6. **Test coverage** — fetches test files related to changed code
+### 🟡 Important Issues
+Ticket #204 requires idempotency support — this PR adds no idempotency key
+check on POST /payments.
 
-All of this is fed into a streaming `gpt-4o` call via [GitHub Models](https://github.com/marketplace/models).
+### 🟢 Test Coverage Gaps
+No test covers the case where the external payment gateway returns a 429.
+
+### 💡 Suggestions
+Consider moving the retry policy into a shared Polly extension rather than
+inlining it here — three other services do the same thing.
+
+### ✅ What's Good
+Clean separation between the gateway adapter and the domain service.
+The new DTO mapping is consistent with the rest of the codebase.
+
+### 📋 Ticket Coverage
+Ticket #204 asked for idempotent payments and a receipt email on success.
+The email dispatch is implemented. The idempotency key is missing.
+```
 
 ---
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)
-- A **GitHub Personal Access Token** (PAT) with `repo` read scope — used to call the GitHub API
-- A **GitHub Models token** (can be the same PAT) — used to call `gpt-4o` via `https://models.inference.ai.azure.com`
+- VS Code + [GitHub Copilot](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) (Chat, Agent mode)
+- A **GitHub Personal Access Token** with `repo` read scope
+  → [Create one here](https://github.com/settings/tokens) (classic or fine-grained)
+
+The same PAT works for both the GitHub API and GitHub Models.
 
 ---
 
-## Project structure
+## Setup
 
-```
-pr-brain/
-├── src/
-│   ├── PrBrain.Api/          # GitHub Copilot Extension (ASP.NET Core API)
-│   │   ├── Endpoints/        # Copilot chat endpoint + health check
-│   │   ├── Middleware/       # GitHub request signature verification
-│   │   ├── Models/           # Request/response and review context models
-│   │   ├── Prompts/          # System prompts
-│   │   └── Services/
-│   │       ├── Ai/           # GitHub Models streaming client + review generator
-│   │       ├── Context/      # PR context assembly (diff, ticket, standards, interfaces, tests)
-│   │       └── GitHub/       # GitHub REST API wrapper (Octokit)
-│   └── PrBrain.Mcp/          # MCP server (stdio transport)
-│       └── Tools/            # PrReviewTool — exposes review_pr as an MCP tool
-└── PrBrain.sln
+### 1. Clone and build
+
+```bash
+git clone https://github.com/cadenlabs/pr-brain.git
+cd pr-brain
+dotnet build
 ```
 
----
+### 2. Configure VS Code
 
-## Option 1 — MCP Server (VS Code / Copilot Chat)
-
-This is the quickest way to get started. The MCP server runs as a local process and exposes a `review_pr` tool that any MCP-compatible client can call.
-
-### 1. Add to your VS Code `mcp.json`
-
-Open your global MCP config (`Cmd+Shift+P` → **MCP: Open User Configuration**) and add:
+Open your MCP config — `Cmd+Shift+P` → **MCP: Open User Configuration** — and add:
 
 ```json
 {
@@ -76,7 +76,7 @@ Open your global MCP config (`Cmd+Shift+P` → **MCP: Open User Configuration**)
       ],
       "env": {
         "GitHub__Token": "YOUR_GITHUB_PAT",
-        "GitHubModels__Token": "YOUR_GITHUB_MODELS_TOKEN",
+        "GitHubModels__Token": "YOUR_GITHUB_PAT",
         "GitHubModels__Model": "gpt-4o",
         "GitHubModels__Endpoint": "https://models.inference.ai.azure.com"
       }
@@ -85,122 +85,68 @@ Open your global MCP config (`Cmd+Shift+P` → **MCP: Open User Configuration**)
 }
 ```
 
-> Replace `/absolute/path/to/pr-brain` with the actual path where you cloned this repo.  
-> `GitHub__Token` and `GitHubModels__Token` can be the same GitHub PAT.
+Replace `/absolute/path/to/pr-brain` with the actual path on your machine.
+`GitHub__Token` and `GitHubModels__Token` can be the same PAT.
 
-### 2. Use it in Copilot Chat
+### 3. Restart the MCP server
 
-Once VS Code restarts (or you reload the MCP server), open Copilot Chat in **Agent mode** and run:
-
-```
-@pr-brain Review this PR: https://github.com/owner/repo/pull/42
-```
-
-or use the shorthand:
-
-```
-@pr-brain review owner/repo #42
-```
+`Cmd+Shift+P` → **MCP: Restart Server** → `pr-brain`
 
 ---
 
-## Option 2 — GitHub Copilot Extension (`PrBrain.Api`)
+## Usage
 
-This deploys PR Brain as a hosted GitHub Copilot Extension that any GitHub user can invoke from the Copilot chat on GitHub.com or in their editor.
-
-### 1. Configure secrets
-
-The API needs two secrets. Set them via [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) for local development:
-
-```bash
-cd src/PrBrain.Api
-
-dotnet user-secrets set "GitHubModels:Token" "YOUR_GITHUB_MODELS_TOKEN"
-```
-
-Or set environment variables (for production / Docker):
-
-```bash
-export GitHubModels__Token="YOUR_GITHUB_MODELS_TOKEN"
-export GitHubModels__Model="gpt-4o"                                      # optional, default
-export GitHubModels__Endpoint="https://models.inference.ai.azure.com"   # optional, default
-```
-
-> The GitHub user token is forwarded automatically by the Copilot platform via the `X-GitHub-Token` header on every request — you do not need to configure it here.
-
-### 2. Run locally
-
-```bash
-cd src/PrBrain.Api
-dotnet run
-```
-
-The API starts at `http://localhost:5000`. Signature verification is **skipped** in `Development` mode so you can test with curl or Postman.
-
-**Health check:**
-
-```bash
-curl http://localhost:5000/health
-# {"status":"ok","service":"pr-brain"}
-```
-
-### 3. Register as a GitHub Copilot Extension
-
-1. Go to **GitHub → Settings → Developer Settings → GitHub Apps** and create a new App.
-2. Under **Copilot**, set the **Callback URL** to your publicly accessible API URL (e.g. via [ngrok](https://ngrok.com/) for local testing).
-3. Install the GitHub App on your account or organisation.
-4. Chat with `@pr-brain` in GitHub Copilot:
+Open Copilot Chat in **Agent mode** and ask:
 
 ```
-@pr-brain review https://github.com/owner/repo/pull/42
+Review this PR: https://github.com/owner/repo/pull/42
 ```
+
+or shorthand:
+
+```
+Review owner/repo #42
+```
+
+That's it.
 
 ---
 
-## Team standards file
+## Team standards (optional but recommended)
 
-PR Brain will look for a `.github/review-brain.md` file in the **target repository** (the repo containing the PR being reviewed). If found, its contents are injected into the review prompt as team standards.
+Add a `.github/review-brain.md` file to any repo you want PR Brain to review. It will be fetched automatically and injected into every review for that repo.
 
-Example `.github/review-brain.md`:
+A starter template is in [`.github/review-brain.md`](.github/review-brain.md) — copy it into your repo and edit it to match your team's rules.
 
-```markdown
-## Our Engineering Standards
+If the file doesn't exist, PR Brain falls back to general engineering best practices.
 
-- All public methods must have XML doc comments
-- No raw SQL — use the repository pattern only
-- Every new service must have a corresponding unit test
-- Prefer `IOptions<T>` over `IConfiguration` for settings
-```
+---
 
-If the file is not present, PR Brain falls back to general engineering best practices.
+## How the context is assembled
+
+PR Brain makes several API calls in parallel before generating a single token:
+
+| Layer | What it fetches |
+|---|---|
+| 1 | PR metadata (title, author, description) |
+| 2 | Full diff |
+| 3 | Linked ticket — auto-detected from `closes #N` / `fixes #N` in the PR body |
+| 4 | `.github/review-brain.md` from the target repo |
+| 5 | Interface files (`I*.cs`) touched by the PR |
+| 6 | Test files related to changed code |
+
+All of it goes into one prompt. `gpt-4o` via [GitHub Models](https://github.com/marketplace/models) does the rest.
 
 ---
 
 ## Configuration reference
 
-| Key | Description | Required |
+| Environment variable | Description | Default |
 |---|---|---|
-| `GitHubModels:Token` | GitHub PAT used to call GitHub Models (gpt-4o) | ✅ |
-| `GitHubModels:Model` | Model name (default: `gpt-4o`) | ❌ |
-| `GitHubModels:Endpoint` | Models endpoint (default: `https://models.inference.ai.azure.com`) | ❌ |
-| `GitHub:Token` *(MCP only)* | GitHub PAT used to call the GitHub REST API | ✅ |
-
-Environment variables use double-underscore as the separator: `GitHubModels__Token`, `GitHub__Token`.
-
----
-
-## Building
-
-```bash
-# Restore + build the entire solution
-dotnet build PrBrain.sln
-
-# Run the API
-dotnet run --project src/PrBrain.Api
-
-# Run the MCP server (stdio — normally launched by the MCP client)
-dotnet run --project src/PrBrain.Mcp
-```
+| `GitHub__Token` | PAT for GitHub REST API calls | required |
+| `GitHubModels__Token` | PAT for GitHub Models (gpt-4o) | required |
+| `GitHubModels__Model` | Model name | `gpt-4o` |
+| `GitHubModels__Endpoint` | Models endpoint | `https://models.inference.ai.azure.com` |
 
 ---
 
